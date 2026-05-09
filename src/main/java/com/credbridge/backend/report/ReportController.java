@@ -1,0 +1,22 @@
+package com.credbridge.backend.report;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/reports")
+public class ReportController {
+
+    private final ReportService reportService;
+
+    public ReportController(ReportService reportService) {
+        this.reportService = reportService;
+    }
+
+    @GetMapping("/{applicationId}")
+    public ReportResponseDto getReport(@PathVariable Long applicationId) {
+        return reportService.getReport(applicationId);
+    }
+}
