@@ -3,6 +3,7 @@ package com.credbridge.backend.application;
 import com.credbridge.backend.scoring.ScoreResponseDto;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -27,29 +28,33 @@ public class ApplicationController {
 
     @PostMapping("/basic")
     @ResponseStatus(HttpStatus.CREATED)
-    public ScoreResponseDto createBasicApplication(@Valid @RequestBody BasicApplicationRequestDto request) {
-        return applicationService.createBasicApplication(request);
+    public ScoreResponseDto createBasicApplication(
+            @Valid @RequestBody BasicApplicationRequestDto request,
+            Principal principal
+    ) {
+        return applicationService.createBasicApplication(request, principal.getName());
     }
 
     @GetMapping
-    public List<ApplicationResponseDto> getApplications() {
-        return applicationService.getApplications()
+    public List<ApplicationResponseDto> getApplications(Principal principal) {
+        return applicationService.getApplications(principal.getName())
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     @GetMapping("/{id}")
-    public ApplicationResponseDto getApplication(@PathVariable Long id) {
-        return toResponse(applicationService.getApplication(id));
+    public ApplicationResponseDto getApplication(@PathVariable Long id, Principal principal) {
+        return toResponse(applicationService.getApplication(id, principal.getName()));
     }
 
     @PatchMapping("/{id}/status")
     public ApplicationResponseDto updateStatus(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateApplicationStatusRequestDto request
+            @Valid @RequestBody UpdateApplicationStatusRequestDto request,
+            Principal principal
     ) {
-        return toResponse(applicationService.updateStatus(id, request.getStatus()));
+        return toResponse(applicationService.updateStatus(id, request.getStatus(), principal.getName()));
     }
 
     private ApplicationResponseDto toResponse(LoanApplication application) {
@@ -60,7 +65,8 @@ public class ApplicationController {
                 application.getStatus(),
                 application.getRequestedAmount(),
                 application.getTenureMonths(),
-                application.getCreatedAt()
+                application.getCreatedAt(),
+                application.getUser() == null ? null : application.getUser().getId()
         );
     }
 
@@ -71,7 +77,8 @@ public class ApplicationController {
             ApplicationStatus status,
             BigDecimal requestedAmount,
             Integer tenureMonths,
-            LocalDateTime createdAt
+            LocalDateTime createdAt,
+            Long userId
     ) {
     }
 }

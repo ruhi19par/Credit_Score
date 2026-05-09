@@ -8,7 +8,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.credbridge.backend.auth.AuthTestSupport;
+import com.credbridge.backend.auth.UserRole;
 import com.credbridge.backend.scoring.CreditScoreRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,9 +35,21 @@ class ApplicationControllerTest {
     @Autowired
     private CreditScoreRepository creditScoreRepository;
 
+    private String borrowerToken;
+    private String otherBorrowerToken;
+    private String adminToken;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        borrowerToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.BORROWER);
+        otherBorrowerToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.BORROWER);
+        adminToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.ADMIN);
+    }
+
     @Test
     void createsBasicApplicationAndReport() throws Exception {
         MvcResult result = mockMvc.perform(post("/api/applications/basic")
+                        .header("Authorization", borrowerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -57,7 +72,8 @@ class ApplicationControllerTest {
 
         Long applicationId = JsonTestSupport.longValue(result, "applicationId");
 
-        mockMvc.perform(get("/api/reports/{applicationId}", applicationId))
+        mockMvc.perform(get("/api/reports/{applicationId}", applicationId)
+                        .header("Authorization", borrowerToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.applicationId").value(applicationId))
                 .andExpect(jsonPath("$.fullName").value("Asha Kumar"))
@@ -65,13 +81,17 @@ class ApplicationControllerTest {
                 .andExpect(jsonPath("$.score").value(100));
 
         assertThat(loanApplicationRepository.findById(applicationId))
-                .hasValueSatisfying(application -> assertThat(application.getFinancialProfile()).isNotNull());
+                .hasValueSatisfying(application -> {
+                    assertThat(application.getFinancialProfile()).isNotNull();
+                    assertThat(application.getUser()).isNotNull();
+                });
         assertThat(creditScoreRepository.findByApplicationId(applicationId)).isPresent();
     }
 
     @Test
     void rejectsInvalidBasicApplication() throws Exception {
         mockMvc.perform(post("/api/applications/basic")
+                        .header("Authorization", borrowerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -96,6 +116,7 @@ class ApplicationControllerTest {
         Long applicationId = createApplication();
 
         mockMvc.perform(patch("/api/applications/{id}/status", applicationId)
+                        .header("Authorization", adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -107,25 +128,62 @@ class ApplicationControllerTest {
                 .andExpect(jsonPath("$.status").value("UNDER_REVIEW"));
     }
 
-    private Long createApplication() throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/applications/basic")
+    @Test
+    void borrowerCannotReadAnotherBorrowersApplication() throws Exception {
+        Long applicationId = createApplication();
+
+        mockMvc.perform(get("/api/applications/{id}", applicationId)
+                        .header("Authorization", otherBorrowerToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void borrowerCannotUpdateStatus() throws Exception {
+        Long applicationId = createApplication();
+
+        mockMvc.perform(patch("/api/applications/{id}/status", applicationId)
+                        .header("Authorization", borrowerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "fullName": "Nikhil Shah",
-                                  "employmentType": "BUSINESS",
-                                  "monthlyIncome": 60000,
-                                  "monthlyExpenses": 28000,
-                                  "existingDebtPayment": 5000,
-                                  "repaymentHistory": "GOOD",
-                                  "incomeStability": "MODERATE",
-                                  "requestedAmount": 200000,
-                                  "tenureMonths": 20
+                                  "status": "APPROVED"
                                 }
                                 """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rejectsApplicationCreateWithoutToken() throws Exception {
+        mockMvc.perform(post("/api/applications/basic")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validApplicationJson("Unauthenticated User")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private Long createApplication() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/applications/basic")
+                        .header("Authorization", borrowerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validApplicationJson("Nikhil Shah")))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         return JsonTestSupport.longValue(result, "applicationId");
+    }
+
+    private String validApplicationJson(String fullName) {
+        return """
+                {
+                  "fullName": "%s",
+                  "employmentType": "BUSINESS",
+                  "monthlyIncome": 60000,
+                  "monthlyExpenses": 28000,
+                  "existingDebtPayment": 5000,
+                  "repaymentHistory": "GOOD",
+                  "incomeStability": "MODERATE",
+                  "requestedAmount": 200000,
+                  "tenureMonths": 20
+                }
+                """.formatted(fullName);
     }
 }
