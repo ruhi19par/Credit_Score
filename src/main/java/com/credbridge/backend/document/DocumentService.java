@@ -33,6 +33,7 @@ public class DocumentService {
     private final DocumentRepository documentRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final CurrentUserService currentUserService;
+    private final DocumentProcessingService documentProcessingService;
     private final Path uploadRoot;
     private final long maxFileSizeBytes;
 
@@ -40,12 +41,14 @@ public class DocumentService {
             DocumentRepository documentRepository,
             LoanApplicationRepository loanApplicationRepository,
             CurrentUserService currentUserService,
+            DocumentProcessingService documentProcessingService,
             @Value("${app.documents.upload-dir:uploads/documents}") String uploadDir,
             @Value("${app.documents.max-file-size-bytes:5242880}") long maxFileSizeBytes
     ) {
         this.documentRepository = documentRepository;
         this.loanApplicationRepository = loanApplicationRepository;
         this.currentUserService = currentUserService;
+        this.documentProcessingService = documentProcessingService;
         this.uploadRoot = Path.of(uploadDir).normalize();
         this.maxFileSizeBytes = maxFileSizeBytes;
     }
@@ -87,7 +90,9 @@ public class DocumentService {
         document.setStatus(DocumentStatus.UPLOADED);
         document.setCreatedAt(LocalDateTime.now());
 
-        return documentRepository.save(document);
+        Document savedDocument = documentRepository.save(document);
+        documentProcessingService.process(savedDocument);
+        return savedDocument;
     }
 
     private void validateFile(MultipartFile file) {

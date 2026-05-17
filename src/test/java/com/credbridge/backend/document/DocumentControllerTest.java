@@ -9,8 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.credbridge.backend.application.JsonTestSupport;
+import com.credbridge.backend.application.LoanApplicationRepository;
 import com.credbridge.backend.auth.AuthTestSupport;
 import com.credbridge.backend.auth.UserRole;
+import com.credbridge.backend.scoring.CreditScoreRepository;
 import java.util.Arrays;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,6 +40,15 @@ class DocumentControllerTest {
 
     @Autowired
     private DocumentRepository documentRepository;
+
+    @Autowired
+    private ExtractedFinancialFieldsRepository extractedFinancialFieldsRepository;
+
+    @Autowired
+    private CreditScoreRepository creditScoreRepository;
+
+    @Autowired
+    private LoanApplicationRepository loanApplicationRepository;
 
     private String borrowerToken;
     private String otherBorrowerToken;
@@ -71,16 +82,51 @@ class DocumentControllerTest {
                 .andExpect(jsonPath("$.applicationId").value(applicationId))
                 .andExpect(jsonPath("$.documentType").value("BANK_STATEMENT"))
                 .andExpect(jsonPath("$.originalFilename").value("bank-statement.pdf"))
-                .andExpect(jsonPath("$.status").value("UPLOADED"))
+                .andExpect(jsonPath("$.status").value("PROCESSED"))
                 .andExpect(jsonPath("$.storedFilePath").doesNotExist())
                 .andReturn();
 
-        assertThat(JsonTestSupport.longValue(result, "id")).isPositive();
+        Long documentId = JsonTestSupport.longValue(result, "id");
+        assertThat(documentId).isPositive();
         assertThat(documentRepository.findByApplicationIdOrderByCreatedAtDesc(applicationId))
                 .singleElement()
                 .satisfies(document ->
                         assertThat(Files.readString(Path.of(document.getStoredFilePath()))).isEqualTo("statement-content")
                 );
+        assertThat(extractedFinancialFieldsRepository.findByDocumentId(documentId))
+                .hasValueSatisfying(fields -> {
+                    assertThat(fields.getMonthlyIncome()).isEqualByComparingTo("60000");
+                    assertThat(fields.getMonthlyExpenses()).isEqualByComparingTo("25000");
+                    assertThat(fields.getExistingDebtPayment()).isEqualByComparingTo("5000");
+                });
+        assertThat(creditScoreRepository.findByApplicationId(applicationId)).isPresent();
+        assertThat(loanApplicationRepository.findById(applicationId))
+                .hasValueSatisfying(application -> assertThat(application.getMode().name()).isEqualTo("VERIFIED"));
+    }
+
+    @Test
+    void extractsFinancialValuesFromUploadedTextDocument() throws Exception {
+        Long applicationId = createApplication("Verified Borrower", borrowerToken);
+
+        mockMvc.perform(multipart("/api/documents/upload")
+                        .file(new MockMultipartFile(
+                                "file",
+                                "income.pdf",
+                                MediaType.APPLICATION_PDF_VALUE,
+                                "income 90000 expenses 30000 debt 10000".getBytes()
+                        ))
+                        .param("applicationId", applicationId.toString())
+                        .param("documentType", "INCOME_PROOF")
+                        .header("Authorization", borrowerToken))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PROCESSED"));
+
+        assertThat(extractedFinancialFieldsRepository.findAll())
+                .anySatisfy(fields -> {
+                    assertThat(fields.getMonthlyIncome()).isEqualByComparingTo("90000");
+                    assertThat(fields.getMonthlyExpenses()).isEqualByComparingTo("30000");
+                    assertThat(fields.getExistingDebtPayment()).isEqualByComparingTo("10000");
+                });
     }
 
     @Test

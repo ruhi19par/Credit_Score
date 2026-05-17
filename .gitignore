@@ -32,6 +32,10 @@ build/
 ### Local uploads ###
 uploads/
 
+### Codex runtime ###
+.agents/
+.codex/
+
 ### Frontend ###
 frontend/node_modules/
 frontend/dist/
