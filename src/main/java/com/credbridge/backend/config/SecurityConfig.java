@@ -1,7 +1,9 @@
 package com.credbridge.backend.config;
 
 import com.credbridge.backend.auth.UserRepository;
+import java.util.Arrays;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -20,6 +22,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 public class SecurityConfig {
 
+    @Value("${app.cors.allowed-origins:http://localhost:3000}")
+    private String allowedOrigins;
+
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
@@ -37,7 +42,12 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/me").authenticated()
-                        .requestMatchers("/api/applications/**", "/api/reports/**", "/api/documents/**").authenticated()
+                        .requestMatchers(
+                                "/api/applications/**",
+                                "/api/reports/**",
+                                "/api/documents/**",
+                                "/api/admin/**"
+                        ).authenticated()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(
@@ -67,7 +77,10 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+        configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

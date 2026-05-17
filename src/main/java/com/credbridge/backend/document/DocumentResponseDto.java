@@ -7,7 +7,6 @@ public record DocumentResponseDto(
         Long applicationId,
         DocumentType documentType,
         String originalFilename,
-        String storedFilePath,
         DocumentStatus status,
         LocalDateTime createdAt
 ) {

@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.credbridge.backend.application.JsonTestSupport;
 import com.credbridge.backend.auth.AuthTestSupport;
 import com.credbridge.backend.auth.UserRole;
+import java.util.Arrays;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -71,12 +72,15 @@ class DocumentControllerTest {
                 .andExpect(jsonPath("$.documentType").value("BANK_STATEMENT"))
                 .andExpect(jsonPath("$.originalFilename").value("bank-statement.pdf"))
                 .andExpect(jsonPath("$.status").value("UPLOADED"))
-                .andExpect(jsonPath("$.storedFilePath").isString())
+                .andExpect(jsonPath("$.storedFilePath").doesNotExist())
                 .andReturn();
 
-        String storedFilePath = JsonTestSupport.stringValue(result, "storedFilePath");
-        assertThat(Files.readString(Path.of(storedFilePath))).isEqualTo("statement-content");
-        assertThat(documentRepository.findByApplicationIdOrderByCreatedAtDesc(applicationId)).hasSize(1);
+        assertThat(JsonTestSupport.longValue(result, "id")).isPositive();
+        assertThat(documentRepository.findByApplicationIdOrderByCreatedAtDesc(applicationId))
+                .singleElement()
+                .satisfies(document ->
+                        assertThat(Files.readString(Path.of(document.getStoredFilePath()))).isEqualTo("statement-content")
+                );
     }
 
     @Test
@@ -103,6 +107,34 @@ class DocumentControllerTest {
                         .param("documentType", "ID_PROOF")
                         .header("Authorization", otherBorrowerToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rejectsUnsupportedFileType() throws Exception {
+        Long applicationId = createApplication("Borrower One", borrowerToken);
+
+        mockMvc.perform(multipart("/api/documents/upload")
+                        .file(new MockMultipartFile("file", "script.exe", MediaType.APPLICATION_OCTET_STREAM_VALUE, "x".getBytes()))
+                        .param("applicationId", applicationId.toString())
+                        .param("documentType", "OTHER")
+                        .header("Authorization", borrowerToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Document file type is not supported"));
+    }
+
+    @Test
+    void rejectsOversizedFile() throws Exception {
+        Long applicationId = createApplication("Borrower One", borrowerToken);
+        byte[] oversizedContent = new byte[1025];
+        Arrays.fill(oversizedContent, (byte) 'a');
+
+        mockMvc.perform(multipart("/api/documents/upload")
+                        .file(new MockMultipartFile("file", "large.pdf", MediaType.APPLICATION_PDF_VALUE, oversizedContent))
+                        .param("applicationId", applicationId.toString())
+                        .param("documentType", "BANK_STATEMENT")
+                        .header("Authorization", borrowerToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Document file exceeds maximum allowed size"));
     }
 
     @Test

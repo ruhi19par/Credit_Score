@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,28 +24,35 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class DocumentService {
 
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "application/pdf",
+            "image/png",
+            "image/jpeg"
+    );
+
     private final DocumentRepository documentRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final CurrentUserService currentUserService;
     private final Path uploadRoot;
+    private final long maxFileSizeBytes;
 
     public DocumentService(
             DocumentRepository documentRepository,
             LoanApplicationRepository loanApplicationRepository,
             CurrentUserService currentUserService,
-            @Value("${app.documents.upload-dir:uploads/documents}") String uploadDir
+            @Value("${app.documents.upload-dir:uploads/documents}") String uploadDir,
+            @Value("${app.documents.max-file-size-bytes:5242880}") long maxFileSizeBytes
     ) {
         this.documentRepository = documentRepository;
         this.loanApplicationRepository = loanApplicationRepository;
         this.currentUserService = currentUserService;
         this.uploadRoot = Path.of(uploadDir).normalize();
+        this.maxFileSizeBytes = maxFileSizeBytes;
     }
 
     @Transactional
     public Document upload(Long applicationId, DocumentType documentType, MultipartFile file, String email) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Document file is required");
-        }
+        validateFile(file);
 
         User user = currentUserService.requireUser(email);
         LoanApplication application = loanApplicationRepository.findById(applicationId)
@@ -80,6 +88,18 @@ public class DocumentService {
         document.setCreatedAt(LocalDateTime.now());
 
         return documentRepository.save(document);
+    }
+
+    private void validateFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Document file is required");
+        }
+        if (file.getSize() > maxFileSizeBytes) {
+            throw new IllegalArgumentException("Document file exceeds maximum allowed size");
+        }
+        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
+            throw new IllegalArgumentException("Document file type is not supported");
+        }
     }
 
     public List<Document> getApplicationDocuments(Long applicationId, String email) {

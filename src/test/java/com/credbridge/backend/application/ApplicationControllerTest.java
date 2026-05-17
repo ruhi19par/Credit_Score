@@ -6,16 +6,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.credbridge.backend.auth.AuthTestSupport;
 import com.credbridge.backend.auth.UserRole;
 import com.credbridge.backend.scoring.CreditScoreRepository;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -86,6 +89,34 @@ class ApplicationControllerTest {
                     assertThat(application.getUser()).isNotNull();
                 });
         assertThat(creditScoreRepository.findByApplicationId(applicationId)).isPresent();
+    }
+
+    @Test
+    void downloadsReportPdf() throws Exception {
+        Long applicationId = createApplication();
+
+        MvcResult result = mockMvc.perform(get("/api/reports/{applicationId}/pdf", applicationId)
+                        .header("Authorization", borrowerToken))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PDF_VALUE))
+                .andExpect(header().string(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        Matchers.containsString("credit-report-" + applicationId + ".pdf")
+                ))
+                .andReturn();
+
+        byte[] pdf = result.getResponse().getContentAsByteArray();
+        assertThat(pdf).hasSizeGreaterThan(100);
+        assertThat(new String(pdf, 0, 4)).isEqualTo("%PDF");
+    }
+
+    @Test
+    void borrowerCannotDownloadAnotherBorrowersReportPdf() throws Exception {
+        Long applicationId = createApplication();
+
+        mockMvc.perform(get("/api/reports/{applicationId}/pdf", applicationId)
+                        .header("Authorization", otherBorrowerToken))
+                .andExpect(status().isForbidden());
     }
 
     @Test
