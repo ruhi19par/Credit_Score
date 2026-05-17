@@ -37,7 +37,7 @@ public class SecurityConfig {
                         ).permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/me").authenticated()
-                        .requestMatchers("/api/applications/**", "/api/reports/**").authenticated()
+                        .requestMatchers("/api/applications/**", "/api/reports/**", "/api/documents/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(

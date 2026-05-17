@@ -3,13 +3,17 @@ package com.credbridge.backend.application;
 import com.jayway.jsonpath.JsonPath;
 import org.springframework.test.web.servlet.MvcResult;
 
-final class JsonTestSupport {
+public final class JsonTestSupport {
 
     private JsonTestSupport() {
     }
 
-    static Long longValue(MvcResult result, String fieldName) throws Exception {
+    public static Long longValue(MvcResult result, String fieldName) throws Exception {
         Number value = JsonPath.read(result.getResponse().getContentAsString(), "$." + fieldName);
         return value.longValue();
+    }
+
+    public static String stringValue(MvcResult result, String fieldName) throws Exception {
+        return JsonPath.read(result.getResponse().getContentAsString(), "$." + fieldName);
     }
 }

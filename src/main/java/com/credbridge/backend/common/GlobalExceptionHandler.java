@@ -2,6 +2,7 @@ package com.credbridge.backend.common;
 
 import com.credbridge.backend.auth.DuplicateEmailException;
 import com.credbridge.backend.auth.InvalidCredentialsException;
+import com.credbridge.backend.document.DocumentStorageException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -71,6 +72,36 @@ public class GlobalExceptionHandler {
         return new ApiErrorDto(
                 HttpStatus.NOT_FOUND.value(),
                 HttpStatus.NOT_FOUND.getReasonPhrase(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                LocalDateTime.now()
+        );
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiErrorDto handleIllegalArgument(
+            IllegalArgumentException exception,
+            HttpServletRequest request
+    ) {
+        return new ApiErrorDto(
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                LocalDateTime.now()
+        );
+    }
+
+    @ExceptionHandler(DocumentStorageException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ApiErrorDto handleDocumentStorage(
+            DocumentStorageException exception,
+            HttpServletRequest request
+    ) {
+        return new ApiErrorDto(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
                 exception.getMessage(),
                 request.getRequestURI(),
                 LocalDateTime.now()
