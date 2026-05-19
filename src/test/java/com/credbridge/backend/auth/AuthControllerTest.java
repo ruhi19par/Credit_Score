@@ -57,6 +57,24 @@ class AuthControllerTest {
     }
 
     @Test
+    void registersUserWithoutRoleAsBorrower() throws Exception {
+        String email = uniqueEmail("register-no-role");
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Asha Kumar",
+                                  "email": "%s",
+                                  "password": "strongpass123"
+                                }
+                                """.formatted(email)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.role").value("BORROWER"));
+    }
+
+    @Test
     void rejectsDuplicateEmail() throws Exception {
         String email = uniqueEmail("duplicate");
         register(email, "strongpass123");

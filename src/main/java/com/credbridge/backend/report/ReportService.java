@@ -9,6 +9,7 @@ import com.credbridge.backend.financial.FinancialProfile;
 import com.credbridge.backend.financial.FinancialProfileRepository;
 import com.credbridge.backend.scoring.CreditScore;
 import com.credbridge.backend.scoring.CreditScoreRepository;
+import com.credbridge.backend.privacy.PrivacyService;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,17 +22,20 @@ public class ReportService {
     private final FinancialProfileRepository financialProfileRepository;
     private final CreditScoreRepository creditScoreRepository;
     private final CurrentUserService currentUserService;
+    private final PrivacyService privacyService;
 
     public ReportService(
             LoanApplicationRepository loanApplicationRepository,
             FinancialProfileRepository financialProfileRepository,
             CreditScoreRepository creditScoreRepository,
-            CurrentUserService currentUserService
+            CurrentUserService currentUserService,
+            PrivacyService privacyService
     ) {
         this.loanApplicationRepository = loanApplicationRepository;
         this.financialProfileRepository = financialProfileRepository;
         this.creditScoreRepository = creditScoreRepository;
         this.currentUserService = currentUserService;
+        this.privacyService = privacyService;
     }
 
     public ReportResponseDto getReport(Long applicationId, String email) {
@@ -39,6 +43,9 @@ public class ReportService {
         LoanApplication application = loanApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationId));
         requireAccess(application, user);
+        if (!currentUserService.isStaff(user)) {
+            privacyService.requireActiveConsent(application, user);
+        }
 
         FinancialProfile financialProfile = financialProfileRepository.findByApplicationId(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Financial profile not found: " + applicationId));
@@ -54,6 +61,9 @@ public class ReportService {
                 application.getRequestedAmount(),
                 application.getTenureMonths(),
                 application.getCreatedAt(),
+                application.getReviewNotes(),
+                application.getReviewedByUserId(),
+                application.getReviewedAt(),
                 financialProfile.getEmploymentType(),
                 financialProfile.getMonthlyIncome(),
                 financialProfile.getMonthlyExpenses(),
@@ -66,8 +76,19 @@ public class ReportService {
                 creditScore.getExpenseRatio(),
                 creditScore.getRepaymentCapacity(),
                 creditScore.getSuggestedLoanLimit(),
+                creditScore.getCashFlowStabilityScore(),
+                creditScore.getBusinessHealthScore(),
                 toList(creditScore.getPositiveFactors()),
-                toList(creditScore.getRiskFactors())
+                toList(creditScore.getRiskFactors()),
+                toList(creditScore.getFraudIndicators()),
+                creditScore.getRiskExplanation(),
+                creditScore.getModelConfidenceScore(),
+                creditScore.getDefaultRisk(),
+                creditScore.getLendingRecommendation(),
+                creditScore.getVerifiedDocumentCount(),
+                creditScore.getLlmModel(),
+                creditScore.getLlmPromptVersion(),
+                creditScore.getLlmReasoningSummary()
         );
     }
 

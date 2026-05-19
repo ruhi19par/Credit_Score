@@ -3,6 +3,7 @@ package com.credbridge.backend.common;
 import com.credbridge.backend.auth.DuplicateEmailException;
 import com.credbridge.backend.auth.InvalidCredentialsException;
 import com.credbridge.backend.document.DocumentStorageException;
+import com.credbridge.backend.document.OcrException;
 import com.credbridge.backend.report.ReportPdfGenerationException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
@@ -103,6 +104,21 @@ public class GlobalExceptionHandler {
         return new ApiErrorDto(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                LocalDateTime.now()
+        );
+    }
+
+    @ExceptionHandler(OcrException.class)
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    public ApiErrorDto handleOcr(
+            OcrException exception,
+            HttpServletRequest request
+    ) {
+        return new ApiErrorDto(
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(),
                 exception.getMessage(),
                 request.getRequestURI(),
                 LocalDateTime.now()

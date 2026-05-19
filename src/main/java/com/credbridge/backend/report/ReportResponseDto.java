@@ -30,6 +30,12 @@ public class ReportResponseDto {
 
     private LocalDateTime createdAt;
 
+    private String reviewNotes;
+
+    private Long reviewedByUserId;
+
+    private LocalDateTime reviewedAt;
+
     private EmploymentType employmentType;
 
     private BigDecimal monthlyIncome;
@@ -54,7 +60,29 @@ public class ReportResponseDto {
 
     private BigDecimal suggestedLoanLimit;
 
+    private BigDecimal cashFlowStabilityScore;
+
+    private BigDecimal businessHealthScore;
+
     private List<String> positiveFactors;
 
     private List<String> riskFactors;
+
+    private List<String> fraudIndicators;
+
+    private String riskExplanation;
+
+    private BigDecimal modelConfidenceScore;
+
+    private BigDecimal defaultRisk;
+
+    private String lendingRecommendation;
+
+    private Integer verifiedDocumentCount;
+
+    private String llmModel;
+
+    private String llmPromptVersion;
+
+    private String llmReasoningSummary;
 }

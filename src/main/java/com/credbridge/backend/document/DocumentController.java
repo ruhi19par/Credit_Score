@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.security.Principal;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -68,6 +69,23 @@ public class DocumentController {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @DeleteMapping("/{documentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Delete a stored document")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Document deleted"),
+            @ApiResponse(responseCode = "401", description = "JWT token is missing or invalid"),
+            @ApiResponse(responseCode = "403", description = "User cannot access the document"),
+            @ApiResponse(responseCode = "404", description = "Document not found")
+    })
+    public void deleteDocument(
+            @Parameter(description = "Document ID")
+            @PathVariable Long documentId,
+            Principal principal
+    ) {
+        documentService.deleteDocument(documentId, principal.getName());
     }
 
     private DocumentResponseDto toResponse(Document document) {

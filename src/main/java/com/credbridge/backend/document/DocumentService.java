@@ -5,14 +5,13 @@ import com.credbridge.backend.application.LoanApplicationRepository;
 import com.credbridge.backend.auth.CurrentUserService;
 import com.credbridge.backend.auth.User;
 import com.credbridge.backend.common.ResourceNotFoundException;
+import com.credbridge.backend.privacy.PrivacyService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.AccessDeniedException;
@@ -24,87 +23,92 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class DocumentService {
 
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "application/pdf",
-            "image/png",
-            "image/jpeg"
-    );
-
     private final DocumentRepository documentRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final CurrentUserService currentUserService;
     private final DocumentProcessingService documentProcessingService;
-    private final Path uploadRoot;
-    private final long maxFileSizeBytes;
+    private final PrivacyService privacyService;
+    private final FileSecurityService fileSecurityService;
+    private final DocumentStorageService documentStorageService;
+    private final boolean asyncProcessingEnabled;
 
     public DocumentService(
             DocumentRepository documentRepository,
             LoanApplicationRepository loanApplicationRepository,
             CurrentUserService currentUserService,
             DocumentProcessingService documentProcessingService,
-            @Value("${app.documents.upload-dir:uploads/documents}") String uploadDir,
-            @Value("${app.documents.max-file-size-bytes:5242880}") long maxFileSizeBytes
+            PrivacyService privacyService,
+            FileSecurityService fileSecurityService,
+            DocumentStorageService documentStorageService,
+            @Value("${app.documents.async-processing:false}") boolean asyncProcessingEnabled
     ) {
         this.documentRepository = documentRepository;
         this.loanApplicationRepository = loanApplicationRepository;
         this.currentUserService = currentUserService;
         this.documentProcessingService = documentProcessingService;
-        this.uploadRoot = Path.of(uploadDir).normalize();
-        this.maxFileSizeBytes = maxFileSizeBytes;
+        this.privacyService = privacyService;
+        this.fileSecurityService = fileSecurityService;
+        this.documentStorageService = documentStorageService;
+        this.asyncProcessingEnabled = asyncProcessingEnabled;
     }
 
     @Transactional
     public Document upload(Long applicationId, DocumentType documentType, MultipartFile file, String email) {
-        validateFile(file);
+        ValidatedDocumentFile validatedFile = fileSecurityService.validate(file);
 
         User user = currentUserService.requireUser(email);
         LoanApplication application = loanApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationId));
         requireAccess(application, user);
+        privacyService.requireActiveConsent(application, user);
 
         String originalFilename = Path.of(StringUtils.cleanPath(
                 file.getOriginalFilename() == null ? "document" : file.getOriginalFilename()
         )).getFileName().toString();
         String storedFilename = UUID.randomUUID() + "-" + originalFilename;
-        Path applicationDirectory = uploadRoot.resolve(applicationId.toString()).normalize();
-        Path storedPath = applicationDirectory.resolve(storedFilename).normalize();
+        String storageKey = applicationId + "/" + storedFilename;
 
-        if (!storedPath.startsWith(applicationDirectory)) {
-            throw new IllegalArgumentException("Invalid document filename");
-        }
-
+        StoredDocument storedDocument;
         try {
-            Files.createDirectories(applicationDirectory);
-            try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, storedPath, StandardCopyOption.REPLACE_EXISTING);
+            try (InputStream inputStream = Files.newInputStream(validatedFile.path())) {
+                storedDocument = documentStorageService.store(
+                        storageKey,
+                        inputStream,
+                        validatedFile.size(),
+                        validatedFile.contentType()
+                );
             }
         } catch (IOException exception) {
             throw new DocumentStorageException("Failed to store document", exception);
+        } finally {
+            try {
+                Files.deleteIfExists(validatedFile.path());
+            } catch (IOException ignored) {
+                // Temporary upload validation files are best-effort cleanup.
+            }
         }
 
         Document document = new Document();
         document.setApplication(application);
         document.setDocumentType(documentType);
         document.setOriginalFilename(originalFilename);
-        document.setStoredFilePath(storedPath.toString());
+        document.setStoredFilePath(storedDocument.location());
         document.setStatus(DocumentStatus.UPLOADED);
         document.setCreatedAt(LocalDateTime.now());
 
         Document savedDocument = documentRepository.save(document);
-        documentProcessingService.process(savedDocument);
+        privacyService.audit(
+                user,
+                application,
+                "DOCUMENT_UPLOADED",
+                documentType + " document uploaded as " + originalFilename
+        );
+        if (asyncProcessingEnabled) {
+            documentProcessingService.processAsync(savedDocument.getId());
+        } else {
+            documentProcessingService.process(savedDocument.getId());
+        }
         return savedDocument;
-    }
-
-    private void validateFile(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Document file is required");
-        }
-        if (file.getSize() > maxFileSizeBytes) {
-            throw new IllegalArgumentException("Document file exceeds maximum allowed size");
-        }
-        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
-            throw new IllegalArgumentException("Document file type is not supported");
-        }
     }
 
     public List<Document> getApplicationDocuments(Long applicationId, String email) {
@@ -112,8 +116,30 @@ public class DocumentService {
         LoanApplication application = loanApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationId));
         requireAccess(application, user);
+        if (!currentUserService.isStaff(user)) {
+            privacyService.requireActiveConsent(application, user);
+        }
 
         return documentRepository.findByApplicationIdOrderByCreatedAtDesc(applicationId);
+    }
+
+    @Transactional
+    public void deleteDocument(Long documentId, String email) {
+        User user = currentUserService.requireUser(email);
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
+        requireAccess(document.getApplication(), user);
+        if (!currentUserService.isStaff(user)) {
+            privacyService.requireActiveConsent(document.getApplication(), user);
+        }
+        documentStorageService.delete(document);
+        documentRepository.delete(document);
+        privacyService.audit(
+                user,
+                document.getApplication(),
+                "DOCUMENT_DELETED",
+                document.getDocumentType() + " document deleted"
+        );
     }
 
     private void requireAccess(LoanApplication application, User user) {

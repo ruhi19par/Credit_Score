@@ -17,6 +17,9 @@ public record AdminApplicationResponseDto(
         Long userId,
         String userEmail,
         Integer score,
-        RiskLevel riskLevel
+        RiskLevel riskLevel,
+        String reviewNotes,
+        Long reviewedByUserId,
+        LocalDateTime reviewedAt
 ) {
 }

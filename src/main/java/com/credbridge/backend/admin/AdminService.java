@@ -95,7 +95,10 @@ public class AdminService {
                 application.getUser() == null ? null : application.getUser().getId(),
                 application.getUser() == null ? null : application.getUser().getEmail(),
                 score.map(CreditScore::getScore).orElse(null),
-                score.map(CreditScore::getRiskLevel).orElse(null)
+                score.map(CreditScore::getRiskLevel).orElse(null),
+                application.getReviewNotes(),
+                application.getReviewedByUserId(),
+                application.getReviewedAt()
         );
     }
 

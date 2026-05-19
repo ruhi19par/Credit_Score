@@ -10,4 +10,6 @@ public class UpdateApplicationStatusRequestDto {
 
     @NotNull
     private ApplicationStatus status;
+
+    private String reviewNotes;
 }

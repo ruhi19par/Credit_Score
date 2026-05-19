@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.credbridge.backend.application.JsonTestSupport;
 import com.credbridge.backend.application.LoanApplicationRepository;
 import com.credbridge.backend.auth.AuthTestSupport;
+import com.credbridge.backend.auth.UserRepository;
 import com.credbridge.backend.auth.UserRole;
 import com.credbridge.backend.scoring.CreditScoreRepository;
 import java.util.Arrays;
@@ -24,6 +25,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -50,6 +52,15 @@ class DocumentControllerTest {
     @Autowired
     private LoanApplicationRepository loanApplicationRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private DocumentStorageService documentStorageService;
+
     private String borrowerToken;
     private String otherBorrowerToken;
     private String adminToken;
@@ -59,7 +70,7 @@ class DocumentControllerTest {
         deleteUploadRoot();
         borrowerToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.BORROWER);
         otherBorrowerToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.BORROWER);
-        adminToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.ADMIN);
+        adminToken = AuthTestSupport.createUserAndLogin(mockMvc, userRepository, passwordEncoder, UserRole.ADMIN);
     }
 
     @Test
@@ -69,7 +80,7 @@ class DocumentControllerTest {
                 "file",
                 "bank-statement.pdf",
                 MediaType.APPLICATION_PDF_VALUE,
-                "statement-content".getBytes()
+                pdfBytes("statement-content")
         );
 
         MvcResult result = mockMvc.perform(multipart("/api/documents/upload")
@@ -90,14 +101,19 @@ class DocumentControllerTest {
         assertThat(documentId).isPositive();
         assertThat(documentRepository.findByApplicationIdOrderByCreatedAtDesc(applicationId))
                 .singleElement()
-                .satisfies(document ->
-                        assertThat(Files.readString(Path.of(document.getStoredFilePath()))).isEqualTo("statement-content")
-                );
+                .satisfies(document -> {
+                    Path decrypted = documentStorageService.retrieveToTemp(document);
+                    try {
+                        assertThat(Files.readString(decrypted)).contains("statement-content");
+                    } catch (Exception exception) {
+                        throw new AssertionError(exception);
+                    }
+                });
         assertThat(extractedFinancialFieldsRepository.findByDocumentId(documentId))
                 .hasValueSatisfying(fields -> {
-                    assertThat(fields.getMonthlyIncome()).isEqualByComparingTo("60000");
-                    assertThat(fields.getMonthlyExpenses()).isEqualByComparingTo("25000");
-                    assertThat(fields.getExistingDebtPayment()).isEqualByComparingTo("5000");
+                    assertThat(fields.getMonthlyIncome()).isEqualByComparingTo("0");
+                    assertThat(fields.getMonthlyExpenses()).isEqualByComparingTo("0");
+                    assertThat(fields.getExistingDebtPayment()).isEqualByComparingTo("0");
                 });
         assertThat(creditScoreRepository.findByApplicationId(applicationId)).isPresent();
         assertThat(loanApplicationRepository.findById(applicationId))
@@ -113,7 +129,7 @@ class DocumentControllerTest {
                                 "file",
                                 "income.pdf",
                                 MediaType.APPLICATION_PDF_VALUE,
-                                "income 90000 expenses 30000 debt 10000".getBytes()
+                                pdfBytes("income 90000 expenses 30000 debt 10000")
                         ))
                         .param("applicationId", applicationId.toString())
                         .param("documentType", "INCOME_PROOF")
@@ -132,7 +148,7 @@ class DocumentControllerTest {
     @Test
     void listsDocumentsForApplication() throws Exception {
         Long applicationId = createApplication("Nikhil Shah", borrowerToken);
-        uploadDocument(applicationId, "id-proof.png", "ID_PROOF", borrowerToken);
+        uploadDocument(applicationId, "id-proof.pdf", "ID_PROOF", borrowerToken);
         uploadDocument(applicationId, "income.pdf", "INCOME_PROOF", borrowerToken);
 
         mockMvc.perform(get("/api/documents/application/{applicationId}", applicationId)
@@ -148,7 +164,7 @@ class DocumentControllerTest {
         Long applicationId = createApplication("Borrower One", borrowerToken);
 
         mockMvc.perform(multipart("/api/documents/upload")
-                        .file(new MockMultipartFile("file", "id.pdf", MediaType.APPLICATION_PDF_VALUE, "id".getBytes()))
+                        .file(new MockMultipartFile("file", "id.pdf", MediaType.APPLICATION_PDF_VALUE, pdfBytes("id")))
                         .param("applicationId", applicationId.toString())
                         .param("documentType", "ID_PROOF")
                         .header("Authorization", otherBorrowerToken))
@@ -198,7 +214,7 @@ class DocumentControllerTest {
     @Test
     void rejectsUploadWithoutToken() throws Exception {
         mockMvc.perform(multipart("/api/documents/upload")
-                        .file(new MockMultipartFile("file", "id.pdf", MediaType.APPLICATION_PDF_VALUE, "id".getBytes()))
+                        .file(new MockMultipartFile("file", "id.pdf", MediaType.APPLICATION_PDF_VALUE, pdfBytes("id")))
                         .param("applicationId", "1")
                         .param("documentType", "ID_PROOF"))
                 .andExpect(status().isUnauthorized());
@@ -211,7 +227,7 @@ class DocumentControllerTest {
             String token
     ) throws Exception {
         mockMvc.perform(multipart("/api/documents/upload")
-                        .file(new MockMultipartFile("file", filename, MediaType.APPLICATION_PDF_VALUE, "content".getBytes()))
+                        .file(new MockMultipartFile("file", filename, MediaType.APPLICATION_PDF_VALUE, pdfBytes("content")))
                         .param("applicationId", applicationId.toString())
                         .param("documentType", documentType)
                         .header("Authorization", token))
@@ -251,5 +267,9 @@ class DocumentControllerTest {
                 Files.delete(path);
             }
         }
+    }
+
+    private byte[] pdfBytes(String text) {
+        return ("%PDF-1.4\n" + text).getBytes();
     }
 }

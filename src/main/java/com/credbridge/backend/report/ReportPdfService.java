@@ -36,6 +36,7 @@ public class ReportPdfService {
             addFinancials(document, report);
             addFactors(document, "Positive factors", report.getPositiveFactors());
             addFactors(document, "Risk factors", report.getRiskFactors());
+            addFactors(document, "Fraud and mismatch indicators", report.getFraudIndicators());
             document.close();
 
             return outputStream.toByteArray();
@@ -81,6 +82,8 @@ public class ReportPdfService {
         addRow(table, "Expense ratio", percent(report.getExpenseRatio()));
         addRow(table, "Repayment capacity", money(report.getRepaymentCapacity()));
         addRow(table, "Suggested loan limit", money(report.getSuggestedLoanLimit()));
+        addRow(table, "Cash flow stability score", percent(report.getCashFlowStabilityScore()));
+        addRow(table, "Business health score", percent(report.getBusinessHealthScore()));
         document.add(table);
         addSpacer(document);
     }

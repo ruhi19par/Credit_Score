@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.credbridge.backend.auth.AuthTestSupport;
+import com.credbridge.backend.auth.UserRepository;
 import com.credbridge.backend.auth.UserRole;
 import com.credbridge.backend.scoring.CreditScoreRepository;
 import org.hamcrest.Matchers;
@@ -20,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -38,6 +40,12 @@ class ApplicationControllerTest {
     @Autowired
     private CreditScoreRepository creditScoreRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private String borrowerToken;
     private String otherBorrowerToken;
     private String adminToken;
@@ -46,7 +54,7 @@ class ApplicationControllerTest {
     void setUp() throws Exception {
         borrowerToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.BORROWER);
         otherBorrowerToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.BORROWER);
-        adminToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.ADMIN);
+        adminToken = AuthTestSupport.createUserAndLogin(mockMvc, userRepository, passwordEncoder, UserRole.ADMIN);
     }
 
     @Test
@@ -89,6 +97,23 @@ class ApplicationControllerTest {
                     assertThat(application.getUser()).isNotNull();
                 });
         assertThat(creditScoreRepository.findByApplicationId(applicationId)).isPresent();
+    }
+
+    @Test
+    void createsVerifiedApplicationWithoutImmediateScore() throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/applications/verified")
+                        .header("Authorization", borrowerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validApplicationJson("Verified Applicant")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.fullName").value("Verified Applicant"))
+                .andExpect(jsonPath("$.mode").value("VERIFIED"))
+                .andExpect(jsonPath("$.status").value("SUBMITTED"))
+                .andReturn();
+
+        Long applicationId = JsonTestSupport.longValue(result, "id");
+        assertThat(creditScoreRepository.findByApplicationId(applicationId)).isEmpty();
     }
 
     @Test

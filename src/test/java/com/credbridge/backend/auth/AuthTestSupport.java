@@ -1,7 +1,9 @@
 package com.credbridge.backend.auth;
 
 import com.jayway.jsonpath.JsonPath;
+import java.time.LocalDateTime;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -28,6 +30,38 @@ public final class AuthTestSupport {
                                 }
                                 """.formatted(role.name(), email, password, role.name())))
                 .andExpect(status().isCreated());
+
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s",
+                                  "password": "%s"
+                                }
+                                """.formatted(email, password)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String token = JsonPath.read(result.getResponse().getContentAsString(), "$.token");
+        return "Bearer " + token;
+    }
+
+    public static String createUserAndLogin(
+            MockMvc mockMvc,
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            UserRole role
+    ) throws Exception {
+        String email = uniqueEmail(role.name().toLowerCase());
+        String password = "strongpass123";
+
+        User user = new User();
+        user.setFullName(role.name() + " User");
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(password));
+        user.setRole(role);
+        user.setCreatedAt(LocalDateTime.now());
+        userRepository.save(user);
 
         MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

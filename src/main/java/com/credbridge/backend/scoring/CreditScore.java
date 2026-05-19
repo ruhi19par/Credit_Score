@@ -43,11 +43,39 @@ public class CreditScore {
 
     private BigDecimal suggestedLoanLimit;
 
+    private BigDecimal cashFlowStabilityScore;
+
+    private BigDecimal businessHealthScore;
+
+    private Integer verifiedDocumentCount;
+
     @Column(length = 1000)
     private String positiveFactors;
 
     @Column(length = 1000)
     private String riskFactors;
+
+    @Column(length = 1000)
+    private String fraudIndicators;
+
+    @Column(length = 1000)
+    private String riskExplanation;
+
+    private BigDecimal modelConfidenceScore;
+
+    private BigDecimal defaultRisk;
+
+    private String lendingRecommendation;
+
+    private String llmModel;
+
+    private String llmPromptVersion;
+
+    @Column(columnDefinition = "TEXT")
+    private String llmRawResponse;
+
+    @Column(length = 1000)
+    private String llmReasoningSummary;
 
     private LocalDateTime createdAt;
 }

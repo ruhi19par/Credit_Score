@@ -43,6 +43,12 @@ public class LoanApplication {
 
     private LocalDateTime createdAt;
 
+    private String reviewNotes;
+
+    private Long reviewedByUserId;
+
+    private LocalDateTime reviewedAt;
+
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;

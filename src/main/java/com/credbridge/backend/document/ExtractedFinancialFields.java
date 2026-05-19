@@ -36,6 +36,18 @@ public class ExtractedFinancialFields {
 
     private BigDecimal existingDebtPayment;
 
+    private BigDecimal averageMonthlyDeposits;
+
+    private BigDecimal averageMonthlyWithdrawals;
+
+    private BigDecimal businessRevenue;
+
+    private BigDecimal taxValue;
+
+    private BigDecimal invoiceTotal;
+
+    private BigDecimal revenueConsistencyScore;
+
     private BigDecimal confidenceScore;
 
     @Column(nullable = false)

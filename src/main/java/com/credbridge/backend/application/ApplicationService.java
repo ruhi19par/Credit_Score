@@ -4,6 +4,7 @@ import com.credbridge.backend.auth.CurrentUserService;
 import com.credbridge.backend.auth.User;
 import com.credbridge.backend.common.ResourceNotFoundException;
 import com.credbridge.backend.financial.FinancialProfile;
+import com.credbridge.backend.privacy.PrivacyService;
 import com.credbridge.backend.scoring.BasicScoringService;
 import com.credbridge.backend.scoring.CreditScore;
 import com.credbridge.backend.scoring.CreditScoreRepository;
@@ -21,43 +22,25 @@ public class ApplicationService {
     private final CreditScoreRepository creditScoreRepository;
     private final BasicScoringService basicScoringService;
     private final CurrentUserService currentUserService;
+    private final PrivacyService privacyService;
 
     public ApplicationService(
             LoanApplicationRepository loanApplicationRepository,
             CreditScoreRepository creditScoreRepository,
             BasicScoringService basicScoringService,
-            CurrentUserService currentUserService
+            CurrentUserService currentUserService,
+            PrivacyService privacyService
     ) {
         this.loanApplicationRepository = loanApplicationRepository;
         this.creditScoreRepository = creditScoreRepository;
         this.basicScoringService = basicScoringService;
         this.currentUserService = currentUserService;
+        this.privacyService = privacyService;
     }
 
     @Transactional
     public ScoreResponseDto createBasicApplication(BasicApplicationRequestDto request, String email) {
-        User user = currentUserService.requireUser(email);
-
-        LoanApplication application = new LoanApplication();
-        application.setFullName(request.getFullName());
-        application.setMode(ApplicationMode.BASIC);
-        application.setStatus(ApplicationStatus.SUBMITTED);
-        application.setRequestedAmount(request.getRequestedAmount());
-        application.setTenureMonths(request.getTenureMonths());
-        application.setCreatedAt(LocalDateTime.now());
-        application.setUser(user);
-
-        FinancialProfile financialProfile = new FinancialProfile();
-        financialProfile.setApplication(application);
-        financialProfile.setEmploymentType(request.getEmploymentType());
-        financialProfile.setMonthlyIncome(request.getMonthlyIncome());
-        financialProfile.setMonthlyExpenses(request.getMonthlyExpenses());
-        financialProfile.setExistingDebtPayment(request.getExistingDebtPayment());
-        financialProfile.setRepaymentHistory(request.getRepaymentHistory());
-        financialProfile.setIncomeStability(request.getIncomeStability());
-        application.setFinancialProfile(financialProfile);
-
-        LoanApplication savedApplication = loanApplicationRepository.save(application);
+        LoanApplication savedApplication = createApplication(request, email, ApplicationMode.BASIC);
         ScoreResponseDto scoreResponse = basicScoringService.calculate(request);
 
         CreditScore creditScore = new CreditScore();
@@ -88,6 +71,11 @@ public class ApplicationService {
         );
     }
 
+    @Transactional
+    public LoanApplication createVerifiedApplication(BasicApplicationRequestDto request, String email) {
+        return createApplication(request, email, ApplicationMode.VERIFIED);
+    }
+
     public List<LoanApplication> getApplications(String email) {
         User user = currentUserService.requireUser(email);
         if (currentUserService.isStaff(user)) {
@@ -107,7 +95,7 @@ public class ApplicationService {
     }
 
     @Transactional
-    public LoanApplication updateStatus(Long id, ApplicationStatus status, String email) {
+    public LoanApplication updateStatus(Long id, ApplicationStatus status, String reviewNotes, String email) {
         User user = currentUserService.requireUser(email);
         if (!currentUserService.isStaff(user)) {
             throw new AccessDeniedException("Only staff users can update application status");
@@ -116,6 +104,15 @@ public class ApplicationService {
         LoanApplication application = loanApplicationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + id));
         application.setStatus(status);
+        application.setReviewNotes(reviewNotes == null || reviewNotes.isBlank() ? null : reviewNotes.trim());
+        application.setReviewedByUserId(user.getId());
+        application.setReviewedAt(LocalDateTime.now());
+        privacyService.audit(
+                user,
+                application,
+                "APPLICATION_STATUS_UPDATED",
+                "Updated status to " + status + (application.getReviewNotes() == null ? "" : ": " + application.getReviewNotes())
+        );
         return application;
     }
 
@@ -133,5 +130,38 @@ public class ApplicationService {
 
     private String toStoredText(List<String> values) {
         return String.join("\n", values);
+    }
+
+    private LoanApplication createApplication(BasicApplicationRequestDto request, String email, ApplicationMode mode) {
+        User user = currentUserService.requireUser(email);
+
+        LoanApplication application = new LoanApplication();
+        application.setFullName(request.getFullName());
+        application.setMode(mode);
+        application.setStatus(ApplicationStatus.SUBMITTED);
+        application.setRequestedAmount(request.getRequestedAmount());
+        application.setTenureMonths(request.getTenureMonths());
+        application.setCreatedAt(LocalDateTime.now());
+        application.setUser(user);
+
+        FinancialProfile financialProfile = new FinancialProfile();
+        financialProfile.setApplication(application);
+        financialProfile.setEmploymentType(request.getEmploymentType());
+        financialProfile.setMonthlyIncome(request.getMonthlyIncome());
+        financialProfile.setMonthlyExpenses(request.getMonthlyExpenses());
+        financialProfile.setExistingDebtPayment(request.getExistingDebtPayment());
+        financialProfile.setRepaymentHistory(request.getRepaymentHistory());
+        financialProfile.setIncomeStability(request.getIncomeStability());
+        application.setFinancialProfile(financialProfile);
+
+        LoanApplication savedApplication = loanApplicationRepository.save(application);
+        privacyService.recordConsent(savedApplication, user, PrivacyService.CREDIT_ASSESSMENT_PURPOSE);
+        privacyService.audit(
+                user,
+                savedApplication,
+                "APPLICATION_CREATED",
+                "Created " + mode + " application"
+        );
+        return savedApplication;
     }
 }

@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.credbridge.backend.application.JsonTestSupport;
 import com.credbridge.backend.auth.AuthTestSupport;
+import com.credbridge.backend.auth.UserRepository;
 import com.credbridge.backend.auth.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -28,13 +30,19 @@ class AdminControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     private String borrowerToken;
     private String adminToken;
 
     @BeforeEach
     void setUp() throws Exception {
         borrowerToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.BORROWER);
-        adminToken = AuthTestSupport.registerAndLogin(mockMvc, UserRole.ADMIN);
+        adminToken = AuthTestSupport.createUserAndLogin(mockMvc, userRepository, passwordEncoder, UserRole.ADMIN);
     }
 
     @Test

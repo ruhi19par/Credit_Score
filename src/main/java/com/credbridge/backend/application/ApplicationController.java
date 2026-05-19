@@ -35,6 +35,15 @@ public class ApplicationController {
         return applicationService.createBasicApplication(request, principal.getName());
     }
 
+    @PostMapping("/verified")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApplicationResponseDto createVerifiedApplication(
+            @Valid @RequestBody BasicApplicationRequestDto request,
+            Principal principal
+    ) {
+        return toResponse(applicationService.createVerifiedApplication(request, principal.getName()));
+    }
+
     @GetMapping
     public List<ApplicationResponseDto> getApplications(Principal principal) {
         return applicationService.getApplications(principal.getName())
@@ -54,7 +63,12 @@ public class ApplicationController {
             @Valid @RequestBody UpdateApplicationStatusRequestDto request,
             Principal principal
     ) {
-        return toResponse(applicationService.updateStatus(id, request.getStatus(), principal.getName()));
+        return toResponse(applicationService.updateStatus(
+                id,
+                request.getStatus(),
+                request.getReviewNotes(),
+                principal.getName()
+        ));
     }
 
     private ApplicationResponseDto toResponse(LoanApplication application) {
@@ -66,7 +80,10 @@ public class ApplicationController {
                 application.getRequestedAmount(),
                 application.getTenureMonths(),
                 application.getCreatedAt(),
-                application.getUser() == null ? null : application.getUser().getId()
+                application.getUser() == null ? null : application.getUser().getId(),
+                application.getReviewNotes(),
+                application.getReviewedByUserId(),
+                application.getReviewedAt()
         );
     }
 
@@ -78,7 +95,10 @@ public class ApplicationController {
             BigDecimal requestedAmount,
             Integer tenureMonths,
             LocalDateTime createdAt,
-            Long userId
+            Long userId,
+            String reviewNotes,
+            Long reviewedByUserId,
+            LocalDateTime reviewedAt
     ) {
     }
 }
