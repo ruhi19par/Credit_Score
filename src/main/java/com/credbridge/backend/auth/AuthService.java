@@ -34,7 +34,7 @@ public class AuthService {
         user.setFullName(request.getFullName().trim());
         user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        user.setRole(UserRole.BORROWER);
+        user.setRole(request.getRole() == null ? UserRole.BORROWER : request.getRole());
         user.setCreatedAt(LocalDateTime.now());
 
         return UserResponseDto.from(userRepository.save(user));

@@ -75,6 +75,44 @@ class AuthControllerTest {
     }
 
     @Test
+    void registersAdminWhenRoleIsRequested() throws Exception {
+        String email = uniqueEmail("register-admin");
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Admin User",
+                                  "email": "%s",
+                                  "password": "strongpass123",
+                                  "role": "ADMIN"
+                                }
+                                """.formatted(email)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
+    void registersLenderWhenRoleIsRequested() throws Exception {
+        String email = uniqueEmail("register-lender");
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Lender User",
+                                  "email": "%s",
+                                  "password": "strongpass123",
+                                  "role": "LENDER"
+                                }
+                                """.formatted(email)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.role").value("LENDER"));
+    }
+
+    @Test
     void rejectsDuplicateEmail() throws Exception {
         String email = uniqueEmail("duplicate");
         register(email, "strongpass123");

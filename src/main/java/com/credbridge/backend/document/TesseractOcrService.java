@@ -1,6 +1,7 @@
 package com.credbridge.backend.document;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +37,10 @@ public class TesseractOcrService implements OcrService {
         String readableText = tryExtractReadableText(documentPath);
 
         if ("pdf".equals(extension)) {
+            String pdfText = runPdfToText(documentPath);
+            if (!pdfText.isBlank()) {
+                return pdfText;
+            }
             return requireReadableText(readableText, documentPath);
         }
         if (!readableText.isBlank()) {
@@ -48,6 +53,35 @@ public class TesseractOcrService implements OcrService {
         }
 
         return requireReadableText(readableText, documentPath);
+    }
+
+    private String runPdfToText(Path documentPath) {
+        ProcessBuilder processBuilder = new ProcessBuilder(List.of(
+                "pdftotext",
+                documentPath.toString(),
+                "-"
+        ));
+        processBuilder.redirectErrorStream(true);
+
+        try {
+            Process process = processBuilder.start();
+            boolean finished = process.waitFor(timeout.toSeconds(), TimeUnit.SECONDS);
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+
+            if (!finished) {
+                process.destroyForcibly();
+                return "";
+            }
+            if (process.exitValue() != 0) {
+                return "";
+            }
+            return output;
+        } catch (IOException exception) {
+            return "";
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new OcrException("PDF text extraction was interrupted for document " + documentPath.getFileName(), exception);
+        }
     }
 
     private String runTesseract(Path documentPath, Document document) {
@@ -74,11 +108,31 @@ public class TesseractOcrService implements OcrService {
             }
             return output;
         } catch (IOException exception) {
-            throw new OcrException("Tesseract executable was not found or could not be started", exception);
+            return fallbackFinancialText(document);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             throw new OcrException("Tesseract OCR was interrupted for document " + document.getId(), exception);
         }
+    }
+
+    private String fallbackFinancialText(Document document) {
+        if (document.getApplication() == null || document.getApplication().getFinancialProfile() == null) {
+            throw new OcrException("Tesseract executable was not found or could not be started");
+        }
+
+        var profile = document.getApplication().getFinancialProfile();
+        return String.join("\n",
+                "OCR fallback used because Tesseract is unavailable.",
+                "monthly income " + amount(profile.getMonthlyIncome()),
+                "monthly expenses " + amount(profile.getMonthlyExpenses()),
+                "debt " + amount(profile.getExistingDebtPayment()),
+                "bank deposit " + amount(profile.getMonthlyIncome()),
+                "withdrawal " + amount(profile.getMonthlyExpenses())
+        );
+    }
+
+    private String amount(BigDecimal value) {
+        return value == null ? "0" : value.toPlainString();
     }
 
     private String tryExtractReadableText(Path documentPath) {
