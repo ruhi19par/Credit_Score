@@ -30,6 +30,7 @@ public class DocumentService {
     private final PrivacyService privacyService;
     private final FileSecurityService fileSecurityService;
     private final DocumentStorageService documentStorageService;
+    private final ExtractedFinancialFieldsRepository extractedFinancialFieldsRepository;
     private final boolean asyncProcessingEnabled;
 
     public DocumentService(
@@ -40,6 +41,7 @@ public class DocumentService {
             PrivacyService privacyService,
             FileSecurityService fileSecurityService,
             DocumentStorageService documentStorageService,
+            ExtractedFinancialFieldsRepository extractedFinancialFieldsRepository,
             @Value("${app.documents.async-processing:false}") boolean asyncProcessingEnabled
     ) {
         this.documentRepository = documentRepository;
@@ -49,6 +51,7 @@ public class DocumentService {
         this.privacyService = privacyService;
         this.fileSecurityService = fileSecurityService;
         this.documentStorageService = documentStorageService;
+        this.extractedFinancialFieldsRepository = extractedFinancialFieldsRepository;
         this.asyncProcessingEnabled = asyncProcessingEnabled;
     }
 
@@ -133,6 +136,7 @@ public class DocumentService {
             privacyService.requireActiveConsent(document.getApplication(), user);
         }
         documentStorageService.delete(document);
+        extractedFinancialFieldsRepository.deleteByDocumentId(documentId);
         documentRepository.delete(document);
         privacyService.audit(
                 user,

@@ -9,4 +9,6 @@ public interface ExtractedFinancialFieldsRepository extends JpaRepository<Extrac
     Optional<ExtractedFinancialFields> findByDocumentId(Long documentId);
 
     List<ExtractedFinancialFields> findByDocumentApplicationId(Long applicationId);
+
+    void deleteByDocumentId(Long documentId);
 }

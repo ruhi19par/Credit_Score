@@ -2,6 +2,7 @@ package com.credbridge.backend.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -212,6 +213,21 @@ class DocumentControllerTest {
     }
 
     @Test
+    void deletesProcessedDocumentAndExtractedFields() throws Exception {
+        Long applicationId = createApplication("Delete Borrower", borrowerToken);
+        Long documentId = uploadDocument(applicationId, "income.pdf", "INCOME_PROOF", borrowerToken);
+
+        assertThat(extractedFinancialFieldsRepository.findByDocumentId(documentId)).isPresent();
+
+        mockMvc.perform(delete("/api/documents/{documentId}", documentId)
+                        .header("Authorization", borrowerToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(extractedFinancialFieldsRepository.findByDocumentId(documentId)).isEmpty();
+        assertThat(documentRepository.findById(documentId)).isEmpty();
+    }
+
+    @Test
     void rejectsUploadWithoutToken() throws Exception {
         mockMvc.perform(multipart("/api/documents/upload")
                         .file(new MockMultipartFile("file", "id.pdf", MediaType.APPLICATION_PDF_VALUE, pdfBytes("id")))
@@ -220,18 +236,21 @@ class DocumentControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    private void uploadDocument(
+    private Long uploadDocument(
             Long applicationId,
             String filename,
             String documentType,
             String token
     ) throws Exception {
-        mockMvc.perform(multipart("/api/documents/upload")
+        MvcResult result = mockMvc.perform(multipart("/api/documents/upload")
                         .file(new MockMultipartFile("file", filename, MediaType.APPLICATION_PDF_VALUE, pdfBytes("content")))
                         .param("applicationId", applicationId.toString())
                         .param("documentType", documentType)
                         .header("Authorization", token))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        return JsonTestSupport.longValue(result, "id");
     }
 
     private Long createApplication(String fullName, String token) throws Exception {
