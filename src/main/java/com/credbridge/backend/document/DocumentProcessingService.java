@@ -13,12 +13,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class DocumentProcessingService {
+
+    private static final Logger log = LoggerFactory.getLogger(DocumentProcessingService.class);
 
     private static final Pattern INCOME_PATTERN = Pattern.compile("(?i)(?:salary|net\\s*pay|gross\\s*pay|monthly\\s*income|income)\\D+(\\d[\\d,]*(?:\\.\\d+)?)");
     private static final Pattern EXPENSE_PATTERN = Pattern.compile("(?i)(?:monthly\\s*)?expenses?\\D+(\\d[\\d,]*(?:\\.\\d+)?)");
@@ -161,8 +165,13 @@ public class DocumentProcessingService {
     }
 
     @Async
+    @Transactional
     public void processAsync(Long documentId) {
-        process(documentId);
+        try {
+            process(documentId);
+        } catch (RuntimeException exception) {
+            log.error("Document async processing failed for document {}", documentId, exception);
+        }
     }
 
     private BigDecimal extractValue(String text, Pattern pattern, BigDecimal fallback) {
