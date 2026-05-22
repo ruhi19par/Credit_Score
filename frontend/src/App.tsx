@@ -57,6 +57,7 @@ const riskSummary: RiskLevel[] = ["LOW", "MEDIUM", "HIGH"];
 const reviewStatuses: ApplicationStatus[] = ["UNDER_REVIEW", "APPROVED", "REJECTED"];
 const allowedDocumentTypes = ["application/pdf", "image/png", "image/jpeg"];
 const authRoles: UserRole[] = ["BORROWER", "LENDER", "ADMIN"];
+const APPLICATION_MODE_KEY = "credbridge_application_mode";
 
 type Route =
   | "login"
@@ -301,7 +302,7 @@ function BorrowerDashboard() {
           title="Verified Document Mode"
           value="Evidence-backed scoring"
           details={["Upload salary, bank, tax, or business records", "OCR extraction plus mismatch checks", "Groq explains recommendation when available"]}
-          action={<button className="ghost" onClick={() => navigate("/application")}>Start verified review</button>}
+          action={<button className="ghost" onClick={() => selectApplicationMode("VERIFIED")}>Start verified review</button>}
         />
       </section>
       <ApplicationTable applications={applications} />
@@ -310,7 +311,7 @@ function BorrowerDashboard() {
 }
 
 function ApplicationForm() {
-  const [mode, setMode] = useState<ApplicationMode>("BASIC");
+  const [mode, setMode] = useState<ApplicationMode>(initialApplicationMode);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [form, setForm] = useState<BasicApplicationRequest>({
     fullName: getStoredUser()?.fullName || "",
@@ -348,24 +349,7 @@ function ApplicationForm() {
       if (mode === "VERIFIED") {
         const application = await api.createVerifiedApplication(form as VerifiedApplicationRequest);
         sessionStorage.setItem("last_application_id", String(application.id));
-        setScore({
-          applicationId: application.id,
-          fullName: application.fullName,
-          mode: "VERIFIED",
-          status: application.status,
-          requestedAmount: application.requestedAmount,
-          tenureMonths: application.tenureMonths,
-          employmentType: form.employmentType,
-          monthlyIncome: form.monthlyIncome,
-          monthlyExpenses: form.monthlyExpenses,
-          existingDebtPayment: form.existingDebtPayment,
-          repaymentHistory: form.repaymentHistory,
-          incomeStability: form.incomeStability,
-          verifiedDocumentCount: 0,
-          positiveFactors: [],
-          riskFactors: [],
-          fraudIndicators: []
-        });
+        navigate("/documents");
         return;
       }
 
@@ -997,6 +981,17 @@ function ApplicationTable({ applications }: { applications: ApplicationSummary[]
 function selectApplication(applicationId: number, route: Route) {
   sessionStorage.setItem("last_application_id", String(applicationId));
   navigate(`/${route}`);
+}
+
+function selectApplicationMode(mode: ApplicationMode) {
+  sessionStorage.setItem(APPLICATION_MODE_KEY, mode);
+  navigate("/application");
+}
+
+function initialApplicationMode(): ApplicationMode {
+  const storedMode = sessionStorage.getItem(APPLICATION_MODE_KEY);
+  sessionStorage.removeItem(APPLICATION_MODE_KEY);
+  return storedMode === "VERIFIED" ? "VERIFIED" : "BASIC";
 }
 
 function DataTable({ columns, rows }: { columns: string[]; rows: Array<Array<ReactNode>> }) {
