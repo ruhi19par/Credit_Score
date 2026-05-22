@@ -1,0 +1,25 @@
+%PDF-1.4
+CredTrust Bank - Sample Bank Statement
+
+Account Holder: Ruhi Sharma
+Account Number: XXXX-4582
+Statement Period: 01 Apr 2026 to 30 Apr 2026
+Opening Balance: 120000
+Closing Balance: 159000
+
+Salary Credit / Monthly Income: 75000
+Bank Deposit: 75000
+Average Monthly Deposits: 75000
+Monthly Expenses: 28000
+Withdrawal: 28000
+Average Monthly Withdrawals: 28000
+Existing Debt Payment / EMI: 8000
+Loan Payment: 8000
+
+01 Apr 2026 - Salary Credit - Credit 75000 - Debit 0
+05 Apr 2026 - Rent Debit - Credit 0 - Debit 18000
+10 Apr 2026 - Utilities Debit - Credit 0 - Debit 5000
+15 Apr 2026 - Loan EMI Debit - Credit 0 - Debit 8000
+25 Apr 2026 - Savings Transfer - Credit 0 - Debit 5000
+
+This is a demo-only upload document for CredBridge local testing.
