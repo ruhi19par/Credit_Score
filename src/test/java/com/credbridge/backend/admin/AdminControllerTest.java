@@ -56,7 +56,10 @@ class AdminControllerTest {
                 .andExpect(jsonPath("$[*].fullName", hasItem("Admin Visible Borrower")))
                 .andExpect(jsonPath("$[*].status", hasItem("SCORED")))
                 .andExpect(jsonPath("$[*].score", hasItem(87)))
-                .andExpect(jsonPath("$[*].riskLevel", hasItem("LOW")));
+                .andExpect(jsonPath("$[*].riskLevel", hasItem("LOW")))
+                .andExpect(jsonPath("$[0].modelConfidenceScore").hasJsonPath())
+                .andExpect(jsonPath("$[0].cashFlowStabilityScore").hasJsonPath())
+                .andExpect(jsonPath("$[0].businessHealthScore").hasJsonPath());
     }
 
     @Test
