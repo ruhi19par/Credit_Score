@@ -1135,6 +1135,10 @@ function formatDefaultRisk(value?: string | number | boolean | null) {
 
 function formatUploadError(err: unknown) {
   const message = err instanceof Error ? err.message : "";
+  if (/unable to extract text|ocr|text extraction/i.test(message)) {
+    return `Upload failed because text could not be extracted from the document: ${message}`;
+  }
+
   if (/mime|content type|file type|pdf|png|jpeg|jpg|security|malware|virus|unsafe/i.test(message)) {
     return `Upload blocked by file validation/security checks: ${message}`;
   }

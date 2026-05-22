@@ -9,7 +9,7 @@ RUN ./mvnw -q -DskipTests package
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tesseract-ocr clamav \
+    && apt-get install -y --no-install-recommends tesseract-ocr poppler-utils clamav \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/target/*.jar app.jar
 ENV SPRING_PROFILES_ACTIVE=prod
