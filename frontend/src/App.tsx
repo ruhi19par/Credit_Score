@@ -1,4 +1,4 @@
-import { FormEvent, ReactElement, ReactNode, useEffect, useState } from "react";
+import { FormEvent, ReactElement, ReactNode, useEffect, useRef, useState } from "react";
 import {
   AdminApplication,
   AdminOverview,
@@ -513,6 +513,7 @@ function DocumentUploadPage() {
   const [applications, setApplications] = useState<ApplicationSummary[]>([]);
   const [documentType, setDocumentType] = useState<DocumentType>("BANK_STATEMENT");
   const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [report, setReport] = useState<ScoreReport | null>(null);
   const [error, setError] = useState("");
@@ -559,15 +560,22 @@ function DocumentUploadPage() {
     setDocuments(await api.listDocuments(id));
   }
 
+  function resetFileSelection() {
+    setFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
   function selectFile(nextFile?: File) {
     setSuccess("");
     if (!nextFile) {
-      setFile(null);
+      resetFileSelection();
       return;
     }
 
     if (!allowedDocumentTypes.includes(nextFile.type)) {
-      setFile(null);
+      resetFileSelection();
       setError("Upload blocked. Documents must be PDF, PNG, or JPEG files and pass backend security checks.");
       return;
     }
@@ -584,7 +592,7 @@ function DocumentUploadPage() {
     try {
       const uploaded = await api.uploadDocument(Number(applicationId), documentType, file);
       setSuccess(`Document #${uploaded.id} uploaded for application #${uploaded.applicationId}.`);
-      setFile(null);
+      resetFileSelection();
       await refresh();
     } catch (err) {
       setError(formatUploadError(err));
@@ -658,7 +666,9 @@ function DocumentUploadPage() {
           <option value="BUSINESS">Business client</option>
         </select></label>
         <label>Document type<Select value={documentType} values={documentTypes} onChange={(value) => setDocumentType(value as DocumentType)} /></label>
-        <label>File<input type="file" accept=".pdf,image/png,image/jpeg" onChange={(e) => {
+        <label>File<input ref={fileInputRef} type="file" accept=".pdf,image/png,image/jpeg" onClick={(e) => {
+          e.currentTarget.value = "";
+        }} onChange={(e) => {
           const nextFile = e.target.files?.[0];
           selectFile(nextFile);
           if (nextFile && !allowedDocumentTypes.includes(nextFile.type)) e.currentTarget.value = "";

@@ -225,6 +225,14 @@ class DocumentControllerTest {
 
         assertThat(extractedFinancialFieldsRepository.findByDocumentId(documentId)).isEmpty();
         assertThat(documentRepository.findById(documentId)).isEmpty();
+
+        Long replacementDocumentId = uploadDocument(applicationId, "income.pdf", "INCOME_PROOF", borrowerToken);
+
+        assertThat(replacementDocumentId).isNotEqualTo(documentId);
+        assertThat(extractedFinancialFieldsRepository.findByDocumentId(replacementDocumentId)).isPresent();
+        assertThat(documentRepository.findByApplicationIdOrderByCreatedAtDesc(applicationId))
+                .singleElement()
+                .satisfies(document -> assertThat(document.getId()).isEqualTo(replacementDocumentId));
     }
 
     @Test
