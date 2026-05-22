@@ -96,6 +96,13 @@ public class AdminService {
                 application.getUser() == null ? null : application.getUser().getEmail(),
                 score.map(CreditScore::getScore).orElse(null),
                 score.map(CreditScore::getRiskLevel).orElse(null),
+                score.map(CreditScore::getRiskExplanation).orElse(null),
+                score.map(CreditScore::getModelConfidenceScore).orElse(null),
+                score.map(CreditScore::getDefaultRisk).orElse(null),
+                score.map(CreditScore::getLendingRecommendation).orElse(null),
+                score.map(CreditScore::getCashFlowStabilityScore).orElse(null),
+                score.map(CreditScore::getBusinessHealthScore).orElse(null),
+                score.map(CreditScore::getFraudIndicators).orElse(null),
                 application.getReviewNotes(),
                 application.getReviewedByUserId(),
                 application.getReviewedAt()

@@ -782,12 +782,7 @@ function AdminDashboard({ user }: { user: User }) {
         app.score ?? "-",
         app.riskLevel ? <RiskBadge key={`${app.id}-risk`} risk={app.riskLevel} /> : "-",
         app.mode === "VERIFIED"
-          ? [
-              app.lendingRecommendation,
-              formatOptionalPercent(app.modelConfidenceScore),
-              formatOptionalNumber(app.cashFlowStabilityScore),
-              formatOptionalNumber(app.businessHealthScore)
-            ].filter(Boolean).join(" / ") || label(app.status)
+          ? formatAiStatus(app)
           : "-"
       ])} />
       <section className="table-section">
@@ -1131,6 +1126,25 @@ function formatOptionalPercent(value?: number | null) {
 
 function formatOptionalCurrency(value?: number | null) {
   return value === null || value === undefined ? "-" : currency.format(Number(value));
+}
+
+function formatAiStatus(app: AdminApplication) {
+  const values = [
+    app.lendingRecommendation,
+    formatPresentPercent(app.modelConfidenceScore),
+    formatPresentNumber(app.cashFlowStabilityScore),
+    formatPresentNumber(app.businessHealthScore)
+  ].filter((value): value is string => Boolean(value));
+
+  return values.length > 0 ? values.join(" / ") : label(app.status);
+}
+
+function formatPresentNumber(value?: number | null) {
+  return value === null || value === undefined ? null : Number(value).toFixed(2);
+}
+
+function formatPresentPercent(value?: number | null) {
+  return value === null || value === undefined ? null : `${Number(value).toFixed(2)}%`;
 }
 
 function formatDefaultRisk(value?: string | number | boolean | null) {

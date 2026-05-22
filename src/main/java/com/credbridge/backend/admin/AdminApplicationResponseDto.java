@@ -18,6 +18,13 @@ public record AdminApplicationResponseDto(
         String userEmail,
         Integer score,
         RiskLevel riskLevel,
+        String riskExplanation,
+        BigDecimal modelConfidenceScore,
+        BigDecimal defaultRisk,
+        String lendingRecommendation,
+        BigDecimal cashFlowStabilityScore,
+        BigDecimal businessHealthScore,
+        String fraudIndicators,
         String reviewNotes,
         Long reviewedByUserId,
         LocalDateTime reviewedAt
