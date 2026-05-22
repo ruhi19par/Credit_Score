@@ -70,12 +70,15 @@ type Route =
   | "admin";
 
 function currentRoute(): Route {
-  const part = window.location.pathname.replace("/", "") as Route;
+  const hashRoute = window.location.hash.replace(/^#\/?/, "");
+  const pathRoute = window.location.pathname.replace(/^\/+/, "");
+  const part = (hashRoute || pathRoute) as Route;
   return part || "dashboard";
 }
 
 function navigate(path: string) {
-  window.history.pushState({}, "", path);
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  window.history.pushState({}, "", `#${normalizedPath}`);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
@@ -87,7 +90,11 @@ export default function App() {
   useEffect(() => {
     const handler = () => setRoute(currentRoute());
     window.addEventListener("popstate", handler);
-    return () => window.removeEventListener("popstate", handler);
+    window.addEventListener("hashchange", handler);
+    return () => {
+      window.removeEventListener("popstate", handler);
+      window.removeEventListener("hashchange", handler);
+    };
   }, []);
 
   useEffect(() => {
