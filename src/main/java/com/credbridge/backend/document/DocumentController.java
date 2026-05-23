@@ -6,6 +6,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.security.Principal;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -95,7 +98,11 @@ public class DocumentController {
                 document.getDocumentType(),
                 document.getOriginalFilename(),
                 document.getStatus(),
-                document.getCreatedAt()
+                toOffsetDateTime(document.getCreatedAt())
         );
+    }
+
+    private OffsetDateTime toOffsetDateTime(LocalDateTime dateTime) {
+        return dateTime == null ? null : dateTime.atZone(ZoneId.systemDefault()).toOffsetDateTime();
     }
 }

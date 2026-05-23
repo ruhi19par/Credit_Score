@@ -1,6 +1,6 @@
 package com.credbridge.backend.document;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public record DocumentResponseDto(
         Long id,
@@ -8,6 +8,6 @@ public record DocumentResponseDto(
         DocumentType documentType,
         String originalFilename,
         DocumentStatus status,
-        LocalDateTime createdAt
+        OffsetDateTime createdAt
 ) {
 }

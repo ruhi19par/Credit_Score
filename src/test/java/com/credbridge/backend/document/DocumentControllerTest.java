@@ -15,6 +15,7 @@ import com.credbridge.backend.auth.AuthTestSupport;
 import com.credbridge.backend.auth.UserRepository;
 import com.credbridge.backend.auth.UserRole;
 import com.credbridge.backend.scoring.CreditScoreRepository;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -95,10 +96,12 @@ class DocumentControllerTest {
                 .andExpect(jsonPath("$.documentType").value("BANK_STATEMENT"))
                 .andExpect(jsonPath("$.originalFilename").value("bank-statement.pdf"))
                 .andExpect(jsonPath("$.status").value("PROCESSED"))
+                .andExpect(jsonPath("$.createdAt").isString())
                 .andExpect(jsonPath("$.storedFilePath").doesNotExist())
                 .andReturn();
 
         Long documentId = JsonTestSupport.longValue(result, "id");
+        OffsetDateTime.parse(JsonTestSupport.stringValue(result, "createdAt"));
         assertThat(documentId).isPositive();
         assertThat(documentRepository.findByApplicationIdOrderByCreatedAtDesc(applicationId))
                 .singleElement()
