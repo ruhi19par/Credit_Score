@@ -779,7 +779,20 @@ function AdminDashboard({ user }: { user: User }) {
           tone: risk.toLowerCase()
         }))} />
       </section>
-      <DataTable columns={["ID", "Mode", "Borrower", "Email", "Status", "Amount", "Score", "Risk", "AI Status"]} rows={applications.map((app) => [
+      <DataTable columns={[
+        "ID",
+        "Mode",
+        "Borrower",
+        "Email",
+        "Status",
+        "Amount",
+        "Score",
+        "Risk",
+        "AI Status",
+        "AI Confidence",
+        "Cash Flow",
+        "Business Health"
+      ]} rows={applications.map((app) => [
         app.id,
         label(app.mode),
         app.fullName,
@@ -788,9 +801,10 @@ function AdminDashboard({ user }: { user: User }) {
         currency.format(Number(app.requestedAmount)),
         app.score ?? "-",
         app.riskLevel ? <RiskBadge key={`${app.id}-risk`} risk={app.riskLevel} /> : "-",
-        app.mode === "VERIFIED"
-          ? formatAiStatus(app)
-          : "-"
+        formatAiStatus(app),
+        formatOptionalPercent(app.modelConfidenceScore),
+        formatOptionalNumber(app.cashFlowStabilityScore),
+        formatOptionalNumber(app.businessHealthScore)
       ])} />
       <section className="table-section">
         <h2>Privacy audit events</h2>
@@ -1136,26 +1150,9 @@ function formatOptionalCurrency(value?: number | null) {
 }
 
 function formatAiStatus(app: AdminApplication) {
-  const values = [
-    app.lendingRecommendation ? `Recommendation: ${label(app.lendingRecommendation)}` : null,
-    formatPresentPercent(app.modelConfidenceScore, "Confidence"),
-    formatPresentNumber(app.cashFlowStabilityScore, "Cash flow"),
-    formatPresentNumber(app.businessHealthScore, "Business health")
-  ].filter((value): value is string => Boolean(value));
-
-  return values.length > 0 ? values.join(" / ") : label(app.status);
-}
-
-function formatPresentNumber(value?: number | null, labelText?: string) {
-  if (value === null || value === undefined) return null;
-  const formatted = Number(value).toFixed(2);
-  return labelText ? `${labelText}: ${formatted}` : formatted;
-}
-
-function formatPresentPercent(value?: number | null, labelText?: string) {
-  if (value === null || value === undefined) return null;
-  const formatted = `${Number(value).toFixed(2)}%`;
-  return labelText ? `${labelText}: ${formatted}` : formatted;
+  if (app.lendingRecommendation) return label(app.lendingRecommendation);
+  if (app.mode !== "VERIFIED") return "Basic mode";
+  return app.status === "SCORED" ? "AI output unavailable" : `Pending AI score (${label(app.status)})`;
 }
 
 function formatDefaultRisk(value?: string | number | boolean | null) {
