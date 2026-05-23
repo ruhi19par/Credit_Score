@@ -204,6 +204,8 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000
 Optional AI scoring:
 
 ```env
+PORT=8080
+SERVER_PORT=8080
 AI_ENABLED=true
 AI_PROVIDER=groq
 AI_API_KEY=your-api-key
@@ -383,6 +385,8 @@ src/test/resources/application-test.properties
 - Keep `spring.jpa.hibernate.ddl-auto=validate`.
 - Set a strong `JWT_SECRET`.
 - Keep `DOCUMENT_ENCRYPTION_KEY` stable; changing it can make existing encrypted local documents unreadable.
+- Set `SPRING_PROFILES_ACTIVE=prod` for production-like runtime.
+- On Render, use the platform-provided `PORT` value. For local runs, use `PORT` or `SERVER_PORT`.
 - Set `CORS_ALLOWED_ORIGINS` to the deployed frontend origin.
 - Disable Swagger in production unless needed:
 

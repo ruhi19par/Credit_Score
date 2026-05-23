@@ -13,5 +13,5 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/target/*.jar app.jar
 ENV SPRING_PROFILES_ACTIVE=prod
-EXPOSE 8080
+EXPOSE 10000
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
