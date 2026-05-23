@@ -1137,21 +1137,25 @@ function formatOptionalCurrency(value?: number | null) {
 
 function formatAiStatus(app: AdminApplication) {
   const values = [
-    app.lendingRecommendation,
-    formatPresentPercent(app.modelConfidenceScore),
-    formatPresentNumber(app.cashFlowStabilityScore),
-    formatPresentNumber(app.businessHealthScore)
+    app.lendingRecommendation ? `Recommendation: ${label(app.lendingRecommendation)}` : null,
+    formatPresentPercent(app.modelConfidenceScore, "Confidence"),
+    formatPresentNumber(app.cashFlowStabilityScore, "Cash flow"),
+    formatPresentNumber(app.businessHealthScore, "Business health")
   ].filter((value): value is string => Boolean(value));
 
   return values.length > 0 ? values.join(" / ") : label(app.status);
 }
 
-function formatPresentNumber(value?: number | null) {
-  return value === null || value === undefined ? null : Number(value).toFixed(2);
+function formatPresentNumber(value?: number | null, labelText?: string) {
+  if (value === null || value === undefined) return null;
+  const formatted = Number(value).toFixed(2);
+  return labelText ? `${labelText}: ${formatted}` : formatted;
 }
 
-function formatPresentPercent(value?: number | null) {
-  return value === null || value === undefined ? null : `${Number(value).toFixed(2)}%`;
+function formatPresentPercent(value?: number | null, labelText?: string) {
+  if (value === null || value === undefined) return null;
+  const formatted = `${Number(value).toFixed(2)}%`;
+  return labelText ? `${labelText}: ${formatted}` : formatted;
 }
 
 function formatDefaultRisk(value?: string | number | boolean | null) {
